@@ -1,0 +1,15 @@
+services:
+  rbwr-monitor:
+    build: .
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - TRUST_PROXY=true
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M

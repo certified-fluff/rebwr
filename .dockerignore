@@ -1,0 +1,12 @@
+node_modules
+npm-debug.log
+.env
+.env.example
+.git
+.gitignore
+logs
+*.md
+ecosystem.config.js
+
+# Local experiments, never shipped (see README -> "Local experiments")
+exp

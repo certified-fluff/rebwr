@@ -1,0 +1,26 @@
+{
+  "name": "rbwr-monitor",
+  "version": "1.0.0",
+  "description": "RBWR Server Monitoring Dashboard",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "pm2": "pm2 start ecosystem.config.js",
+    "pm2:stop": "pm2 stop rbwr-monitor",
+    "pm2:logs": "pm2 logs rbwr-monitor",
+    "docker:build": "docker compose build",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down"
+  },
+  "dependencies": {
+    "compression": "^1.8.1",
+    "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
+    "express": "^4.18.2",
+    "express-rate-limit": "^8.7.0",
+    "helmet": "^8.3.0",
+    "node-fetch": "^2.7.0",
+    "ws": "^8.21.3"
+  }
+}
