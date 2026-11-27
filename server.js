@@ -164,13 +164,26 @@ const wss = new WebSocket.Server({ server, maxPayload: 1024 });
 const wsConnections = new Map();
 
 wss.on('connection', (ws, req) => {
+  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+
+  // Attach this before anything else. A socket 'error' with no listener is
+  // thrown, which reaches the uncaughtException handler below and takes the
+  // whole server down; a single oversized frame from one client did exactly
+  // that. The socket is already closed by the time we get here.
+  ws.on('error', (err) => {
+    const conn = wsConnections.get(ws);
+    log('warn', `WS error [${conn ? conn.id : '?'}] from ${ip}: ${err.message}`);
+    // The map entry is left for the 'close' handler, which always follows an
+    // 'error' event and logs the connection id properly.
+    try { ws.terminate(); } catch (e) {}
+  });
+
   if (wss.clients.size > MAX_WS_CONNECTIONS) {
     log('warn', `Connection rejected: max ${MAX_WS_CONNECTIONS} reached`);
     ws.close(1013, 'Server full');
     return;
   }
 
-  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
   const connId = Date.now() + '-' + Math.random().toString(36).slice(2, 8);
   wsConnections.set(ws, { id: connId, ip, connectedAt: Date.now() });
 
@@ -183,14 +196,14 @@ wss.on('connection', (ws, req) => {
   ws.isAlive = true;
   ws.on('pong', () => { ws.isAlive = true; });
 
-  ws.on('message', (raw) => {
-    if (raw.length > 1024) return;
-    try {
-      const msg = JSON.parse(raw);
-      if (msg.type === 'requestUpdate' && latestData) {
-        ws.send(JSON.stringify({ type: 'update', data: latestData }));
-      }
-    } catch (e) {}
+  // Push-only channel: the server never asks a client for anything. Control
+  // frames (ping/pong/close) are handled inside ws and never reach this
+  // handler, so anything arriving here is data we refuse to accept. Closing
+  // rather than ignoring keeps the socket from being treated as a request API.
+  ws.on('message', () => {
+    if (ws.readyState !== WebSocket.OPEN) return;
+    log('warn', `WS client [${connId}] sent data; closing send-only channel`);
+    ws.close(1003, 'Send-only channel');
   });
 
   ws.on('close', () => {
@@ -210,6 +223,18 @@ const heartbeatInterval = setInterval(() => {
 }, 30000);
 
 wss.on('close', () => clearInterval(heartbeatInterval));
+
+// Server-level failures (handshake, listen) need a listener too.
+wss.on('error', (err) => {
+  log('error', `WebSocket server error: ${err.message}`);
+});
+
+// And the HTTP server itself, e.g. EADDRINUSE. Without this it lands in
+// uncaughtException with a misleading "shutting down" message.
+server.on('error', (err) => {
+  log('error', `HTTP server error: ${err.message}`);
+  gracefulShutdown('server error');
+});
 
 //  Config Endpoint
 app.get('/api/config', (req, res) => {

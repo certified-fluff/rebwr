@@ -51,8 +51,9 @@ All settings come from the environment. `.env.example` lists them with comments.
 - `GET /api/servers/:id` — one server plus global stats. `503` before the first
   poll finishes, `404` if the ID isn't there.
 - `POST /api/verify-captcha` — takes `{ "token": "..." }` and checks it with Google.
-- `WS /` — on the same port. The server sends `{ type: "update", data }` after
-  each poll; clients can send `{ "type": "requestUpdate" }` to ask for one now.
+- `WS /` — on the same port, push-only. The server sends `{ type: "update", data }`
+  once on connect and again after every poll. It never reads from the client, and
+  any data a client sends gets the connection closed with code `1003`.
 
 Requests to `/api/*` are limited to 60 per minute per IP, and captcha checks to
 10. JSON bodies are capped at 10 KB and WebSocket frames at 1 KB.
